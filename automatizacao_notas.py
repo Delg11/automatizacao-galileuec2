@@ -596,37 +596,45 @@ class AutomacaoNotasGalileu:
         if not self.fazer_login():
             return False
         
-        # Etapa 3: Acessar registro de notas
-        if not self.acessar_registro_notas():
-            return False
+        while True:
+            # Etapa 3: Acessar registro de notas
+            if not self.acessar_registro_notas():
+                return False
+            
+            # Etapa 4: Configurar filtros
+            if not self.configurar_filtros_interface_amigavel():
+                return False
+            
+            # Etapa 5: Extrair dados
+            if not self.extrair_dados_tabela():
+                return False
+            
+            # Etapa 6: Aguardar edição
+            if not self.aguardar_edicao_planilha():
+                return False
+            
+            # Etapa 7: Carregar dados editados
+            if not self.carregar_notas_editadas():
+                return False
+            
+            # Etapa 8: Preencher automaticamente
+            if not self.preencher_notas_automaticamente():
+                return False
+            
+            print("\n[SUCESSO] PROCESSO CONCLUIDO PARA A TURMA ATUAL!")
+            print("\nDicas:")
+            print("   • Revise as notas inseridas antes de finalizar")
+            print("   • Salve/submeta as alteracoes no sistema")
+            print("   • Mantenha backup da planilha Excel gerada")
+            
+            # Perguntar se quer continuar para outra turma
+            escolha = input("\n[INPUT] Deseja processar outra turma? (s/n): ").strip().lower()
+            if escolha not in ['s', 'sim', 'y', 'yes']:
+                break
         
-        # Etapa 4: Configurar filtros
-        if not self.configurar_filtros_interface_amigavel():
-            return False
-        
-        # Etapa 5: Extrair dados
-        if not self.extrair_dados_tabela():
-            return False
-        
-        # Etapa 6: Aguardar edição
-        if not self.aguardar_edicao_planilha():
-            return False
-        
-        # Etapa 7: Carregar dados editados
-        if not self.carregar_notas_editadas():
-            return False
-        
-        # Etapa 8: Preencher automaticamente
-        if not self.preencher_notas_automaticamente():
-            return False
-        
-        print("\n[SUCESSO] PROCESSO CONCLUIDO COM SUCESSO!")
-        print("\nDicas finais:")
-        print("   • Revise as notas inseridas antes de finalizar")
-        print("   • Salve/submeta as alteracoes no sistema")
-        print("   • Mantenha backup da planilha Excel gerada")
-        
+        print("\n[SUCESSO] TODOS OS PROCESSOS FORAM CONCLUIDOS!")
         return True
+
     
     def finalizar(self):
         """Finaliza o programa e fecha o navegador"""
@@ -638,6 +646,7 @@ class AutomacaoNotasGalileu:
                     print("[OK] Navegador fechado com sucesso!")
                 else:
                     print("[INFO] Navegador mantido aberto para revisao manual.")
+                    input("\n[INFO] Pressione Enter para encerrar o programa (o navegador será fechado pelo Windows se você encerrar esse programa).")
             except:
                 # Em caso de erro no input, apenas fecha o navegador
                 self.driver.quit()
