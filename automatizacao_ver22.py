@@ -6,7 +6,7 @@ Este programa automatiza o processo de preenchimento de notas no sistema Galileu
 Ele extrai a planilha de notas atual, permite edição offline e depois preenche
 automaticamente todas as notas no sistema.
 
-Versão: 2.1 - Compatível com Windows (Sem Warnings)
+Versão: 2.2 - Compatível com Windows (Sem Warnings) + Opção Gerar Apenas Excel
 Autor: Gabriel Delgado
 Data: 2025
 """
@@ -117,6 +117,7 @@ class AutomacaoNotasGalileu:
                 usuario = input("[INPUT] Digite seu usuário: ")
             if not senha:
                 import getpass
+                print("[INFO] A senha não aparecerá na tela enquanto você digita (isso é normal para segurança)")
                 senha = getpass.getpass("[INPUT] Digite sua senha: ")
             
             # Preenche credenciais
@@ -165,6 +166,57 @@ class AutomacaoNotasGalileu:
         except Exception as e:
             print(f"[ERRO] Erro ao acessar registro de notas: {e}")
             return False
+    
+    def verificar_arquivo_existente(self, nome_arquivo):
+        """
+        Verifica se já existe um arquivo Excel e pergunta se quer usar
+        Args:
+            nome_arquivo (str): Nome do arquivo a ser verificado
+        Returns:
+            str: 'usar_existente', 'sobrescrever' ou 'cancelar'
+        """
+        caminho_completo = os.path.join(os.getcwd(), nome_arquivo)
+        
+        if os.path.exists(caminho_completo):
+            print("\n" + "="*60)
+            print("ARQUIVO EXISTENTE ENCONTRADO!")
+            print("="*60)
+            print(f"[AVISO] Já existe um arquivo com o nome: {nome_arquivo}")
+            print(f"[INFO] Localização: {caminho_completo}")
+            
+            # Verificar data de modificação
+            try:
+                timestamp = os.path.getmtime(caminho_completo)
+                data_modificacao = time.strftime('%d/%m/%Y às %H:%M', time.localtime(timestamp))
+                print(f"[INFO] Última modificação: {data_modificacao}")
+            except:
+                print("[INFO] Não foi possível determinar a data de modificação")
+            
+            print("\nOpções disponíveis:")
+            print("[1] USAR ARQUIVO EXISTENTE")
+            print("    • Carrega o arquivo atual para preencher notas no sistema")
+            print("    • Ideal se você já editou as notas neste arquivo")
+            print("\n[2] SOBRESCREVER ARQUIVO")
+            print("    • Cria um novo arquivo (o atual será perdido)")
+            print("    • Ideal se você quer começar do zero")
+            print("\n[3] CANCELAR")
+            print("    • Cancela a operação atual")
+            
+            while True:
+                escolha = input("\n[INPUT] Digite 1, 2 ou 3: ").strip()
+                if escolha == "1":
+                    print("[OK] Usando arquivo existente...")
+                    return "usar_existente"
+                elif escolha == "2":
+                    print("[OK] O arquivo será sobrescrito...")
+                    return "sobrescrever"
+                elif escolha == "3":
+                    print("[OK] Operação cancelada pelo usuário")
+                    return "cancelar"
+                else:
+                    print("[ERRO] Opção inválida. Digite 1, 2 ou 3.")
+        
+        return "criar_novo"
     
     def configurar_filtros_interface_amigavel(self):
         """
@@ -246,10 +298,91 @@ class AutomacaoNotasGalileu:
         except Exception as e:
             print(f"[ERRO] Erro durante configuração: {e}")
             return False
+        """
+        Interface amigável para configurar curso, turma e período
+        Returns:
+            bool: True se configuração realizada com sucesso
+        """
+        try:
+            print("\n" + "="*60)
+            print("CONFIGURACAO DE FILTROS")
+            print("="*60)
+            
+            # 1. Selecionar Curso
+            print("\nSelecione o curso:")
+            print("1. Ensino Fundamental II")
+            print("2. Ensino Médio")
+            
+            while True:
+                escolha_curso = input("\nDigite 1 ou 2: ").strip()
+                if escolha_curso == "1":
+                    curso_id = self.configuracao_curso['FUND2']
+                    print("[OK] Selecionado: Ensino Fundamental II")
+                    break
+                elif escolha_curso == "2":
+                    curso_id = self.configuracao_curso['MEDIO']
+                    print("[OK] Selecionado: Ensino Médio")
+                    break
+                else:
+                    print("[ERRO] Opção inválida. Digite 1 ou 2.")
+            
+            # Selecionar curso no sistema
+            Select(self.driver.find_element(By.ID, "id_curso")).select_by_value(curso_id)
+            time.sleep(3)  # Aguarda carregamento das turmas
+            
+            # 2. Listar e selecionar turmas disponíveis
+            print("\nTurmas disponíveis:")
+            select_turma = Select(self.driver.find_element(By.ID, "id_turma"))
+            turmas_disponiveis = []
+            
+            for i, option in enumerate(select_turma.options[1:], 1):  # Pula a primeira opção vazia
+                turma_texto = option.text.strip()
+                turmas_disponiveis.append((option.get_attribute('value'), turma_texto))
+                print(f"{i}. {turma_texto}")
+            
+            while True:
+                try:
+                    escolha_turma = int(input(f"\nDigite o número da turma (1-{len(turmas_disponiveis)}): "))
+                    if 1 <= escolha_turma <= len(turmas_disponiveis):
+                        turma_selecionada = turmas_disponiveis[escolha_turma - 1]
+                        select_turma.select_by_value(turma_selecionada[0])
+                        print(f"[OK] Selecionada: {turma_selecionada[1]}")
+                        break
+                    else:
+                        print(f"[ERRO] Número inválido. Digite entre 1 e {len(turmas_disponiveis)}.")
+                except ValueError:
+                    print("[ERRO] Digite apenas números.")
+            
+            time.sleep(3)  # Aguarda carregamento
+            
+            # 3. Selecionar período
+            print("\nSelecione o período:")
+            print("1. 1º Trimestre")
+            print("2. 2º Trimestre") 
+            print("3. 3º Trimestre")
+            
+            while True:
+                escolha_periodo = input("\nDigite 1, 2 ou 3: ").strip()
+                if escolha_periodo in ['1', '2', '3']:
+                    Select(self.driver.find_element(By.ID, "nr_periodo")).select_by_value(escolha_periodo)
+                    print(f"[OK] Selecionado: {escolha_periodo}º Trimestre")
+                    break
+                else:
+                    print("[ERRO] Opção inválida. Digite 1, 2 ou 3.")
+            
+            time.sleep(3)  # Aguarda carregamento final
+            print("\n[OK] Configuração concluída com sucesso!")
+            return True
+            
+        except Exception as e:
+            print(f"[ERRO] Erro durante configuração: {e}")
+            return False
     
-    def extrair_dados_tabela(self):
+    def extrair_dados_tabela(self, forcar_sobrescrita=False):
         """
         Extrai dados da tabela de alunos e cria planilha Excel
+        Args:
+            forcar_sobrescrita (bool): Se True, sobrescreve arquivo sem perguntar
         Returns:
             bool: True se extração realizada com sucesso
         """
@@ -319,6 +452,20 @@ class AutomacaoNotasGalileu:
             nome_base = re.sub(r'\s+', '_', nome_base.strip())
             
             self.nome_arquivo_excel = f"{nome_base}_Notas_Para_Edicao.xlsx"
+            
+            # Verificar se arquivo já existe (apenas se não for forçar sobrescrita)
+            if not forcar_sobrescrita:
+                acao = self.verificar_arquivo_existente(self.nome_arquivo_excel)
+                
+                if acao == "cancelar":
+                    print("[INFO] Operação cancelada pelo usuário")
+                    return False
+                elif acao == "usar_existente":
+                    print(f"[OK] Usando arquivo existente: {self.nome_arquivo_excel}")
+                    return True  # Não cria novo arquivo, usa o existente
+                elif acao == "sobrescrever":
+                    print("[INFO] Arquivo será sobrescrito...")
+                # Se for "criar_novo", continua normalmente
             
             # Salvar arquivo Excel
             caminho_completo = os.path.join(os.getcwd(), self.nome_arquivo_excel)
@@ -545,6 +692,214 @@ class AutomacaoNotasGalileu:
         except Exception:
             return False
     
+    # def _marcar_checkbox_nc(self, id_campo):
+    #     """
+    #     Marca checkbox de 'Não Compareceu' para um campo
+    #     Args:
+    #         id_campo (str): ID do campo base
+    #     Returns:
+    #         bool: True se marcado com sucesso
+    #     """
+    #     try:
+    #         id_checkbox = f"chk-nc-{id_campo.lower()}"
+    #         wait = WebDriverWait(self.driver, 5)
+    #         checkbox = wait.until(EC.presence_of_element_located((By.ID, id_checkbox)))
+            
+    #         # Verificar se está habilitado e se já está marcado
+    #         if not checkbox.is_enabled():
+    #             return False
+    #         if checkbox.is_selected():
+    #             return True
+            
+    #         # PASSO 1: Aguardar que modals de loading desapareçam
+    #         self._aguardar_loading_desaparecer()
+            
+    #         # PASSO 2: Estratégia rápida - JavaScript direto (mais eficiente)
+    #         try:
+    #             success = self.driver.execute_script("""
+    #                 var checkbox = arguments[0];
+    #                 var btnSalvar = document.getElementById('btnSalvar');
+    #                 var modals = document.querySelectorAll('.modal.show, .dialog-loading.show');
+                    
+    #                 // Se há modals visíveis, aguardar um pouco
+    #                 if (modals.length > 0) {
+    #                     return false;
+    #                 }
+                    
+    #                 // Verificar se botão salvar está na frente
+    #                 var checkboxRect = checkbox.getBoundingClientRect();
+    #                 var elementAtPoint = document.elementFromPoint(
+    #                     checkboxRect.left + checkboxRect.width/2, 
+    #                     checkboxRect.top + checkboxRect.height/2
+    #                 );
+                    
+    #                 // Se o checkbox não está acessível, tentar rolar
+    #                 if (elementAtPoint !== checkbox) {
+    #                     checkbox.scrollIntoView({block: 'center', behavior: 'instant'});
+    #                     // Aguardar um frame
+    #                     return false;
+    #                 }
+                    
+    #                 // Marcar o checkbox e disparar eventos
+    #                 checkbox.checked = true;
+    #                 checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+    #                 checkbox.dispatchEvent(new Event('click', { bubbles: true }));
+                    
+    #                 // Executar função onclick se existir
+    #                 if (checkbox.onclick) {
+    #                     checkbox.onclick.call(checkbox);
+    #                 }
+                    
+    #                 return true;
+    #             """, checkbox)
+                
+    #             if success:
+    #                 return True
+    #             else:
+    #                 time.sleep(0.3)  # Aguardar um pouco se não conseguiu na primeira
+                    
+    #         except Exception as e1:
+    #             print(f"   [DEBUG] JavaScript direto falhou: {e1}")
+            
+    #         # PASSO 3: Aguardar que elementos interferentes saiam do caminho
+    #         try:
+    #             # Aguardar especificamente que não há sobreposição
+    #             wait.until(lambda driver: self._elemento_esta_livre_para_clique(checkbox))
+                
+    #             # Tentar clique normal
+    #             checkbox.click()
+    #             return True
+                
+    #         except Exception as e2:
+    #             print(f"   [DEBUG] Clique direto falhou: {e2}")
+            
+    #         # PASSO 4: ActionChains otimizado (estratégia que funcionou para você)
+    #         try:
+    #             from selenium.webdriver.common.action_chains import ActionChains
+                
+    #             # Garantir que o elemento está no viewport
+    #             self.driver.execute_script("""
+    #                 arguments[0].scrollIntoView({
+    #                     block: 'center', 
+    #                     inline: 'center',
+    #                     behavior: 'instant'
+    #                 });
+    #             """, checkbox)
+                
+    #             time.sleep(0.2)  # Aguardar rolagem
+                
+    #             # Usar ActionChains com offset para evitar elementos sobrepostos
+    #             actions = ActionChains(self.driver)
+    #             actions.move_to_element_with_offset(checkbox, -3, -3).click().perform()
+                
+    #             # Verificar se foi marcado
+    #             time.sleep(0.1)
+    #             if checkbox.is_selected():
+    #                 return True
+                    
+    #         except Exception as e3:
+    #             print(f"   [DEBUG] ActionChains falhou: {e3}")
+            
+    #         # PASSO 5: Última tentativa - força via JavaScript
+    #         try:
+    #             self.driver.execute_script("""
+    #                 var checkbox = arguments[0];
+                    
+    #                 // Forçar marcação
+    #                 checkbox.checked = true;
+                    
+    #                 // Disparar todos os eventos possíveis
+    #                 ['change', 'click', 'input'].forEach(function(eventType) {
+    #                     var event = new Event(eventType, { bubbles: true, cancelable: true });
+    #                     checkbox.dispatchEvent(event);
+    #                 });
+                    
+    #                 // Se há função ativaNC (baseado no onclick), tentar executar
+    #                 if (window.ativaNC && typeof window.ativaNC === 'function') {
+    #                     var fieldId = checkbox.id.replace('chk-nc-', '');
+    #                     window.ativaNC(checkbox, fieldId);
+    #                 }
+    #             """, checkbox)
+                
+    #             return checkbox.is_selected()
+                
+    #         except Exception as e4:
+    #             print(f"   [DEBUG] JavaScript força falhou: {e4}")
+            
+    #         return False
+            
+    #     except (NoSuchElementException, TimeoutException) as e:
+    #         print(f"   [DEBUG] Elemento não encontrado {id_campo}: {e}")
+    #         return False
+    #     except Exception as e:
+    #         print(f"   [DEBUG] Erro geral ao marcar checkbox {id_campo}: {e}")
+    #         return False
+
+    # def _aguardar_loading_desaparecer(self, timeout=10):
+    #     """
+    #     Aguarda que modals de loading desapareçam
+    #     """
+    #     try:
+    #         # Aguardar que modals de loading não estejam mais visíveis
+    #         wait = WebDriverWait(self.driver, timeout)
+    #         wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, ".modal.dialog-loading.show")))
+            
+    #         # Aguardar também outros possíveis loaders
+    #         try:
+    #             wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, ".bootbox.modal.show")))
+    #         except:
+    #             pass  # Se não existe, tudo bem
+                
+    #     except TimeoutException:
+    #         print("   [DEBUG] Timeout aguardando loading desaparecer")
+    #     except Exception as e:
+    #         print(f"   [DEBUG] Erro aguardando loading: {e}")
+
+    # def _elemento_esta_livre_para_clique(self, elemento):
+    #     """
+    #     Verifica se um elemento está livre para receber clique
+    #     """
+    #     try:
+    #         # Verificar se há modals na frente
+    #         modals_visiveis = self.driver.execute_script("""
+    #             var modals = document.querySelectorAll('.modal.show, .dialog-loading.show, .bootbox.show');
+    #             return Array.from(modals).some(modal => 
+    #                 window.getComputedStyle(modal).display !== 'none' &&
+    #                 window.getComputedStyle(modal).visibility !== 'hidden'
+    #             );
+    #         """)
+            
+    #         if modals_visiveis:
+    #             return False
+            
+    #         # Verificar se o elemento está realmente clicável
+    #         rect = elemento.rect
+    #         element_at_point = self.driver.execute_script("""
+    #             var rect = arguments[0];
+    #             var centerX = rect.x + rect.width / 2;
+    #             var centerY = rect.y + rect.height / 2;
+    #             var elementAtPoint = document.elementFromPoint(centerX, centerY);
+    #             return elementAtPoint === arguments[1] || arguments[1].contains(elementAtPoint);
+    #         """, rect, elemento)
+            
+    #         return element_at_point
+            
+    #     except Exception:
+    #         return False
+
+    # def _aguardar_elemento_clicavel_rapido(self, elemento, timeout=3):
+    #     """
+    #     Versão rápida para aguardar elemento ficar clicável
+    #     """
+    #     try:
+    #         end_time = time.time() + timeout
+    #         while time.time() < end_time:
+    #             if self._elemento_esta_livre_para_clique(elemento):
+    #                 return True
+    #             time.sleep(0.1)  # Check a cada 100ms
+    #         return False
+    #     except Exception:
+    #         return False
     def _marcar_checkbox_nc(self, id_campo):
         """
         Marca checkbox de 'Não Compareceu' para um campo
@@ -570,6 +925,85 @@ class AutomacaoNotasGalileu:
         except Exception:
             return False
 
+    def selecionar_modo_operacao(self):
+        """
+        Interface para selecionar o modo de operação
+        Returns:
+            str: 'completo' ou 'apenas_excel'
+        """
+        print("\n" + "="*60)
+        print("SELECIONE O MODO DE OPERACAO")
+        print("="*60)
+        print("\n[1] PROCESSO COMPLETO")
+        print("    • Extrai dados para Excel")
+        print("    • Aguarda edição das notas")
+        print("    • Preenche automaticamente no sistema")
+        print("\n[2] GERAR APENAS EXCEL")
+        print("    • Extrai dados para Excel com nomes dos alunos")
+        print("    • Ideal para preparar planilhas offline")
+        print("    • Não preenche notas no sistema")
+        
+        while True:
+            escolha = input("\n[INPUT] Digite 1 ou 2: ").strip()
+            if escolha == "1":
+                print("[OK] Selecionado: PROCESSO COMPLETO")
+                return "completo"
+            elif escolha == "2":
+                print("[OK] Selecionado: GERAR APENAS EXCEL")
+                return "apenas_excel"
+            else:
+                print("[ERRO] Opção inválida. Digite 1 ou 2.")
+    
+    def processo_gerar_apenas_excel(self):
+        """
+        Executa apenas a geração do arquivo Excel
+        Returns:
+            bool: True se Excel gerado com sucesso
+        """
+        try:
+            print("\n" + "="*60)
+            print("MODO: GERAR APENAS EXCEL")
+            print("="*60)
+            
+            # Acessar registro de notas
+            if not self.acessar_registro_notas():
+                return False
+            
+            # Configurar filtros
+            if not self.configurar_filtros_interface_amigavel():
+                return False
+            
+            # Extrair dados e gerar Excel (sem forçar sobrescrita)
+            if not self.extrair_dados_tabela(forcar_sobrescrita=False):
+                return False
+            
+            print("\n" + "="*60)
+            print("ARQUIVO EXCEL GERADO COM SUCESSO!")
+            print("="*60)
+            print(f"[OK] Arquivo: {self.nome_arquivo_excel}")
+            print(f"[OK] Localização: {os.path.join(os.getcwd(), self.nome_arquivo_excel)}")
+            print(f"[OK] Total de alunos: {len(self.df_usuario)}")
+            print("\n[INFO] Você pode agora:")
+            print("   • Editar as notas no arquivo Excel")
+            print("   • Usar o arquivo para controle offline")
+            print("   • Executar o processo completo posteriormente")
+            
+            # Perguntar se quer gerar mais planilhas
+            while True:
+                escolha = input("\n[INPUT] Deseja gerar Excel para outra turma? (s/n): ").strip().lower()
+                if escolha in ['s', 'sim', 'y', 'yes']:
+                    # Recursão para gerar outra planilha
+                    return self.processo_gerar_apenas_excel()
+                elif escolha in ['n', 'não', 'nao', 'no']:
+                    break
+                else:
+                    print("[ERRO] Resposta inválida. Digite 's' para sim ou 'n' para não.")
+            
+            return True
+            
+        except Exception as e:
+            print(f"[ERRO] Erro ao gerar arquivo Excel: {e}")
+            return False
     
     def executar_processo_completo(self):
         """
@@ -580,13 +1014,10 @@ class AutomacaoNotasGalileu:
         print("\n" + "="*60)
         print("   SISTEMA DE AUTOMACAO DE NOTAS GALILEU EC2")
         print("="*60)
-        print("\nVersao 2.1 - Sistema Otimizado (Sem Warnings)")
-        print("Este programa ira:")
-        print("1. Fazer login no sistema")
-        print("2. Configurar filtros (curso, turma, periodo)")
-        print("3. Extrair dados atuais em planilha Excel")
-        print("4. Aguardar sua edicao da planilha")
-        print("5. Preencher automaticamente todas as notas")
+        print("\nVersao 2.2 - Sistema Otimizado + Opção Gerar Apenas Excel")
+        print("Este programa pode:")
+        print("• [MODO COMPLETO] Extrair, editar e preencher notas automaticamente")
+        print("• [MODO EXCEL] Apenas gerar planilha Excel com nomes dos alunos")
         print("\n" + "="*60)
         
         # Etapa 1: Inicializar navegador
@@ -597,44 +1028,53 @@ class AutomacaoNotasGalileu:
         if not self.fazer_login():
             return False
         
-        while True:
-            # Etapa 3: Acessar registro de notas
-            if not self.acessar_registro_notas():
-                return False
-            
-            # Etapa 4: Configurar filtros
-            if not self.configurar_filtros_interface_amigavel():
-                return False
-            
-            # Etapa 5: Extrair dados
-            if not self.extrair_dados_tabela():
-                return False
-            
-            # Etapa 6: Aguardar edição
-            if not self.aguardar_edicao_planilha():
-                return False
-            
-            # Etapa 7: Carregar dados editados
-            if not self.carregar_notas_editadas():
-                return False
-            
-            # Etapa 8: Preencher automaticamente
-            if not self.preencher_notas_automaticamente():
-                return False
-            
-            print("\n[SUCESSO] PROCESSO CONCLUIDO PARA A TURMA ATUAL!")
-            print("\nDicas:")
-            print("   • Revise as notas inseridas antes de finalizar")
-            print("   • Salve/submeta as alteracoes no sistema")
-            print("   • Mantenha backup da planilha Excel gerada")
-            
-            # Perguntar se quer continuar para outra turma
-            escolha = input("\n[INPUT] Deseja processar outra turma? (s/n): ").strip().lower()
-            if escolha not in ['s', 'sim', 'y', 'yes']:
-                break
+        # Etapa 3: Selecionar modo de operação
+        modo_operacao = self.selecionar_modo_operacao()
         
-        print("\n[SUCESSO] TODOS OS PROCESSOS FORAM CONCLUIDOS!")
-        return True
+        if modo_operacao == "apenas_excel":
+            # Modo: Gerar apenas Excel
+            return self.processo_gerar_apenas_excel()
+        
+        else:
+            # Modo: Processo completo
+            while True:
+                # Acessar registro de notas
+                if not self.acessar_registro_notas():
+                    return False
+                
+                # Configurar filtros
+                if not self.configurar_filtros_interface_amigavel():
+                    return False
+                
+                # Extrair dados
+                if not self.extrair_dados_tabela(forcar_sobrescrita=False):
+                    return False
+                
+                # Aguardar edição
+                if not self.aguardar_edicao_planilha():
+                    return False
+                
+                # Carregar dados editados
+                if not self.carregar_notas_editadas():
+                    return False
+                
+                # Preencher automaticamente
+                if not self.preencher_notas_automaticamente():
+                    return False
+                
+                print("\n[SUCESSO] PROCESSO CONCLUIDO PARA A TURMA ATUAL!")
+                print("\nDicas:")
+                print("   • Revise as notas inseridas antes de finalizar")
+                print("   • Salve/submeta as alteracoes no sistema")
+                print("   • Mantenha backup da planilha Excel gerada")
+                
+                # Perguntar se quer continuar para outra turma
+                escolha = input("\n[INPUT] Deseja processar outra turma? (s/n): ").strip().lower()
+                if escolha not in ['s', 'sim', 'y', 'yes']:
+                    break
+            
+            print("\n[SUCESSO] TODOS OS PROCESSOS FORAM CONCLUIDOS!")
+            return True
 
     
     def finalizar(self):
