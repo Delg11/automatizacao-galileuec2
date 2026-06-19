@@ -13,7 +13,7 @@ class ExtratorQAcademico:
         chrome_options = Options()
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
-        
+        chrome_options.binary_location = "/usr/bin/chromium-browser"
         print("[SISTEMA] Abrindo navegador Chrome...")
         self.driver = webdriver.Chrome(options=chrome_options)
         self.driver.maximize_window()
@@ -80,9 +80,6 @@ class ExtratorQAcademico:
                         nota_formatada = ""
                     else:
                         valor = float(str(row['Nota']).replace(',', '.'))
-                        if valor > 10:
-                            print(f"  [!] Nota {valor} de {row['Aluno']} ignorada (maior que 10).")
-                            continue
                         nota_formatada = str(valor).replace('.', ',')
                     
                     # Preenche no site
@@ -111,7 +108,7 @@ if __name__ == "__main__":
     
     try:
         # Abre o site uma única vez
-        bot.driver.get("https://academico.ifes.edu.br/qacademico/index.asp?t=3061")
+        bot.driver.get("https://academico.ifes.edu.br/qacademico/index.asp?t=1000")
         
         while True:
             print("\n" + "="*60)
